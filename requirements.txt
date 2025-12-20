@@ -1,0 +1,6 @@
+groq
+gtts
+pygame
+SpeechRecognition
+python-dotenv
+pydub
