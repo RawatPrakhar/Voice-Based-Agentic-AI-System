@@ -107,7 +107,7 @@ class AgenticHindiGovtAgent:
         mixer.music.unload()
 
     # ==================================================
-    # EVALUATOR HELPERS (UNCHANGED LOGIC)
+    # EVALUATOR HELPERS
     # ==================================================
     def is_ambiguous(self, text, field):
         text = text.lower()
@@ -131,6 +131,9 @@ class AgenticHindiGovtAgent:
 
         return False
 
+    def is_affirmative(self, text):
+        return any(x in text for x in ["हाँ", "हां", "सही", "सही है", "yes"])
+
     # ==================================================
     # AGENTIC LOOP (Planner → Executor → Evaluator)
     # ==================================================
@@ -149,37 +152,29 @@ class AgenticHindiGovtAgent:
             while self.user_data[field] is None:
                 self.speak(question)
 
-                # ---------------- EXECUTOR ----------------
+                # -------- EXECUTOR --------
                 raw = self.tool_stt()
                 if not raw:
                     self.speak("मुझे आपकी आवाज़ नहीं सुनाई दी।")
                     continue
 
-                # ---------------- EVALUATOR ----------------
+                # -------- EVALUATOR --------
                 if self.is_ambiguous(raw, field):
                     self.speak("आपने एक से अधिक उत्तर दिए हैं। कृपया केवल एक उत्तर दें।")
                     continue
 
                 parsed = self.tool_parse(raw, field)
-                self.user_data[field] = parsed
 
-        # ---------------- EVALUATOR (CONFIRMATION) ----------------
-        gender_hi = "महिला" if self.user_data["gender"] == "FEMALE" else "पुरुष"
-        summary = (
-            f"आपने बताया: उम्र {self.user_data['age']}, "
-            f"लिंग {gender_hi}, "
-            f"आय {self.user_data['income']}, "
-            f"और जाति {self.user_data['caste']}। क्या यह सही है?"
-        )
-        self.speak(summary)
+                # -------- IMMEDIATE CONFIRMATION --------
+                self.speak(f"आपने {parsed} बताया है। क्या यह सही है?")
 
-        conf = self.tool_stt()
-        if not conf or not any(x in conf for x in ["हाँ", "सही", "सही है"]):
-            self.speak("ठीक है, कृपया फिर से जानकारी दें।")
-            self.user_data = {k: None for k in self.user_data}
-            return self.run()
+                conf = self.tool_stt()
+                if conf and self.is_affirmative(conf):
+                    self.user_data[field] = parsed
+                else:
+                    self.speak("ठीक है, कृपया दोबारा बताइए।")
 
-        # ---------------- EXECUTOR (FINAL ACTION) ----------------
+        # ---------------- FINAL ACTION ----------------
         self.speak("धन्यवाद। मैं आपके लिए योजनाओं की खोज कर रहा हूँ।")
         results = self.tool_eligibility_engine()
 
